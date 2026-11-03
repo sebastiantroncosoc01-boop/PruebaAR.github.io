@@ -1,0 +1,130 @@
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1.0">
+
+  <title>Visualizador AR de Maquinaria</title>
+
+  <script type="module"
+    src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js">
+  </script>
+
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f4f5f7;
+      color: #222;
+    }
+
+    header {
+      background: #172536;
+      color: white;
+      padding: 16px;
+    }
+
+    main {
+      max-width: 900px;
+      margin: auto;
+      padding: 16px;
+    }
+
+    model-viewer {
+      width: 100%;
+      height: 60vh;
+      min-height: 350px;
+      background: white;
+      border-radius: 12px;
+    }
+
+    .panel {
+      background: white;
+      border-radius: 12px;
+      padding: 16px;
+      margin-top: 16px;
+    }
+
+    button {
+      padding: 12px 18px;
+      border: none;
+      border-radius: 8px;
+      background: #1769aa;
+      color: white;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    .datos {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .dato {
+      background: #f0f3f6;
+      padding: 12px;
+      border-radius: 8px;
+    }
+  </style>
+</head>
+
+<body>
+
+<header>
+  <h2>Visualizador AR Industrial</h2>
+</header>
+
+<main>
+
+  <h2>Mi máquina industrial</h2>
+
+  <model-viewer
+    id="maquina"
+    src="Maquina A prueba.glb"
+    alt="Modelo 3D de la máquina"
+    ar
+    ar-modes="webxr scene-viewer quick-look"
+    ar-scale="fixed"
+    camera-controls
+    shadow-intensity="1"
+    exposure="1">
+
+    <button slot="ar-button">
+      Visualizar en mi espacio
+    </button>
+
+  </model-viewer>
+
+  <div class="panel">
+    <h3>Especificaciones técnicas</h3>
+
+    <div class="datos">
+      <div class="dato">
+        <strong>Dimensiones</strong>
+        <p>6 × 3 × 4 m</p>
+      </div>
+
+      <div class="dato">
+        <strong>Peso</strong>
+        <p>12.000 kg</p>
+      </div>
+
+      <div class="dato">
+        <strong>Potencia</strong>
+        <p>45 kW</p>
+      </div>
+
+      <div class="dato">
+        <strong>Escala</strong>
+        <p>1:1</p>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+</body>
+</html>
