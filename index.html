@@ -1,10 +1,11 @@
 
+
+```html
 <!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport"
-        content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <title>Visualizador AR de Maquinaria</title>
 
@@ -33,6 +34,7 @@
     }
 
     model-viewer {
+      display: block;
       width: 100%;
       height: 60vh;
       min-height: 350px;
@@ -47,7 +49,23 @@
       margin-top: 16px;
     }
 
-    button {
+    .datos {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .dato {
+      background: #f0f3f6;
+      padding: 12px;
+      border-radius: 8px;
+    }
+
+    .dato p {
+      margin-bottom: 0;
+    }
+
+    .ar-button {
       padding: 12px 18px;
       border: none;
       border-radius: 8px;
@@ -57,16 +75,10 @@
       cursor: pointer;
     }
 
-    .datos {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-    }
-
-    .dato {
-      background: #f0f3f6;
-      padding: 12px;
-      border-radius: 8px;
+    @media (max-width: 600px) {
+      .datos {
+        grid-template-columns: 1fr;
+      }
     }
   </style>
 </head>
@@ -78,8 +90,7 @@
 </header>
 
 <main>
-
-  <h2>Mi máquina industrial</h2>
+  <h2>Prueba máquina I</h2>
 
   <model-viewer
     id="maquina"
@@ -87,24 +98,36 @@
     alt="Modelo 3D de la máquina"
     ar
     ar-modes="webxr scene-viewer quick-look"
+    ar-placement="floor"
     ar-scale="fixed"
     camera-controls
     shadow-intensity="1"
     exposure="1">
 
-    <button slot="ar-button">
+    <button class="ar-button" slot="ar-button">
       Visualizar en mi espacio
     </button>
 
   </model-viewer>
 
-  <div class="panel">
-    <h3>Especificaciones técnicas</h3>
+  <section class="panel">
+    <h2>Enfardadora industrial</h2>
+    <p>Equipo para compactación y enfardado de biomasa.</p>
 
     <div class="datos">
       <div class="dato">
+        <strong>Fabricante</strong>
+        <p>IMABE</p>
+      </div>
+
+      <div class="dato">
+        <strong>Modelo</strong>
+        <p>Modelo de referencia</p>
+      </div>
+
+      <div class="dato">
         <strong>Dimensiones</strong>
-        <p>6 × 3 × 4 m</p>
+        <p>8 × 4 × 1 m</p>
       </div>
 
       <div class="dato">
@@ -118,13 +141,24 @@
       </div>
 
       <div class="dato">
-        <strong>Escala</strong>
+        <strong>Capacidad</strong>
+        <p>15 t/h</p>
+      </div>
+
+      <div class="dato">
+        <strong>Escala del modelo</strong>
         <p>1:1</p>
       </div>
-    </div>
-  </div>
 
+      <div class="dato">
+        <strong>Aplicación</strong>
+        <p>Manejo de biomasa</p>
+      </div>
+    </div>
+  </section>
 </main>
 
 </body>
 </html>
+```
+
