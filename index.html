@@ -1,30 +1,28 @@
-
 <!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#172536">
   <title>Visualizador AR Industrial</title>
 
-  <!-- Visor 3D y AR para iPhone -->
+  <!-- Import map: debe declararse antes de los módulos que importan Three.js -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/"
+      }
+    }
+  </script>
+
+  <!-- Visor 3D y AR nativa (AR Quick Look en iPhone / Scene Viewer en Android) -->
   <script type="module"
     src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js">
   </script>
 
-  <!-- Importaciones de Three.js -->
-  <script type="importmap">
-  {
-    "imports": {
-      "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js",
-      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/"
-    }
-  }
-  </script>
-
   <style>
-    * {
-      box-sizing: border-box;
-    }
+    * { box-sizing: border-box; }
 
     body {
       margin: 0;
@@ -37,6 +35,11 @@
       background: #172536;
       color: white;
       padding: 18px;
+    }
+
+    header h1 {
+      margin: 0;
+      font-size: 1.4rem;
     }
 
     main {
@@ -52,21 +55,35 @@
       min-height: 350px;
       background: white;
       border-radius: 12px;
+      overflow: hidden;
+    }
+
+    /* Usamos un botón propio fuera del visor para evitar botones duplicados. */
+    model-viewer::part(default-ar-button) {
+      display: none;
     }
 
     button {
       padding: 12px 16px;
-      border: none;
+      border: 0;
       border-radius: 8px;
       background: #1769aa;
       color: white;
       font-size: 14px;
       cursor: pointer;
+      touch-action: manipulation;
     }
 
     button:disabled {
-      opacity: 0.5;
+      opacity: .5;
       cursor: not-allowed;
+    }
+
+    #openNativeAR, #startAR {
+      width: 100%;
+      margin-top: 12px;
+      padding: 15px;
+      font-size: 16px;
     }
 
     .panel {
@@ -78,7 +95,7 @@
 
     .datos {
       display: grid;
-      grid-template-columns: repeat(2, 1fr);
+      grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 10px;
     }
 
@@ -88,9 +105,7 @@
       border-radius: 8px;
     }
 
-    .dato p {
-      margin-bottom: 0;
-    }
+    .dato p { margin-bottom: 0; }
 
     .status {
       padding: 12px;
@@ -98,25 +113,8 @@
       border-radius: 8px;
       margin-top: 12px;
       font-size: 14px;
+      line-height: 1.45;
     }
-
-    .ar-button {
-      padding: 12px 18px;
-      border: none;
-      border-radius: 8px;
-      background: #1769aa;
-      color: white;
-      font-size: 16px;
-    }
-
-    #startAR {
-      margin-top: 14px;
-      width: 100%;
-      padding: 16px;
-      font-size: 16px;
-    }
-
-    /* Canvas utilizado en AR personalizada */
 
     #xr-canvas-container {
       position: fixed;
@@ -125,14 +123,21 @@
       pointer-events: none;
     }
 
-    /* Interfaz superpuesta a la cámara */
+    #xr-canvas-container canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
 
     #xr-overlay {
       position: fixed;
       inset: 0;
       z-index: 30;
       pointer-events: none;
+      display: none;
     }
+
+    body.in-ar #xr-overlay { display: block; }
 
     #ar-panel {
       position: absolute;
@@ -140,42 +145,31 @@
       left: 12px;
       right: 12px;
       max-width: 340px;
-      background: rgba(23, 37, 54, 0.92);
+      background: rgba(23, 37, 54, .93);
       color: white;
       padding: 15px;
       border-radius: 12px;
       pointer-events: auto;
-      display: none;
     }
 
-    body.in-ar #ar-panel {
-      display: block;
-    }
-
-    #ar-panel h3 {
-      margin: 0 0 8px;
-    }
+    #ar-panel h3 { margin: 0 0 8px; }
 
     #ar-panel p {
       font-size: 13px;
-      line-height: 1.5;
+      line-height: 1.45;
       margin: 5px 0;
     }
 
     #ar-controls {
       position: absolute;
-      bottom: 25px;
+      bottom: max(25px, env(safe-area-inset-bottom));
       left: 12px;
       right: 12px;
-      display: none;
+      display: flex;
       justify-content: center;
       gap: 8px;
       flex-wrap: wrap;
       pointer-events: auto;
-    }
-
-    body.in-ar #ar-controls {
-      display: flex;
     }
 
     #ar-controls button {
@@ -189,682 +183,449 @@
       margin-top: 10px;
     }
 
-    @media (max-width: 550px) {
-      .datos {
-        grid-template-columns: 1fr;
-      }
+    [hidden] { display: none !important; }
 
-      #ar-panel {
-        max-width: 280px;
-      }
+    @media (max-width: 550px) {
+      .datos { grid-template-columns: 1fr; }
+      #ar-panel { max-width: 290px; }
+      #ar-controls button { padding: 11px 12px; }
     }
   </style>
 </head>
 
 <body>
+  <header>
+    <h1>Visualizador AR Industrial</h1>
+  </header>
 
-<header>
-  <h2>Visualizador AR Industrial</h2>
-</header>
+  <main>
+    <h2>Enfardadora industrial</h2>
+    <p>Visualiza el equipo en tres dimensiones y colócalo en tu entorno real.</p>
 
-<main>
+    <model-viewer
+      id="preview"
+      src="./Maquina%20A%20prueba.glb"
+      alt="Enfardadora industrial"
+      ar
+      ar-modes="webxr scene-viewer quick-look"
+      ar-scale="fixed"
+      ar-placement="floor"
+      camera-controls
+      shadow-intensity="1"
+      exposure="1"
+      loading="eager">
+    </model-viewer>
 
-  <h2>Enfardadora industrial</h2>
-
-  <p>
-    Visualiza el equipo en tres dimensiones y colócalo
-    en tu entorno real.
-  </p>
-
-  <!-- Visor 3D y alternativa para iPhone -->
-
-  <model-viewer
-    id="preview"
-    src="Maquina A prueba.glb"
-    alt="Enfardadora industrial"
-    camera-controls
-    shadow-intensity="1"
-    exposure="1"
-    ar-scale="fixed"
-    ar-placement="floor">
-
-    <button class="ar-button" slot="ar-button">
-      Visualizar en mi espacio
+    <button id="openNativeAR" type="button" hidden>
+      Abrir máquina en realidad aumentada
     </button>
 
-  </model-viewer>
+    <button id="startAR" type="button" hidden>
+      Iniciar realidad aumentada personalizada
+    </button>
 
-  <button id="startAR" hidden>
-    Iniciar realidad aumentada personalizada
-  </button>
+    <div id="page-status" class="status" role="status" aria-live="polite">
+      Preparando visualizador...
+    </div>
 
-  <div id="page-status" class="status">
-    Preparando visualizador...
-  </div>
-
-  <div class="panel">
-    <h2>Información técnica</h2>
-
-    <div class="datos">
-
-      <div class="dato">
-        <strong>Fabricante</strong>
-        <p>IMABE</p>
+    <section class="panel">
+      <h2>Información técnica</h2>
+      <div class="datos">
+        <div class="dato"><strong>Fabricante</strong><p>IM</p></div>
+        <div class="dato"><strong>Modelo</strong><p>Modelo de referencia</p></div>
+        <div class="dato"><strong>Dimensiones</strong><p>8 × 4 × 1 m</p></div>
+        <div class="dato"><strong>Peso</strong><p>12.000 kg</p></div>
+        <div class="dato"><strong>Potencia</strong><p>45 kW</p></div>
+        <div class="dato"><strong>Capacidad</strong><p>15 t/h</p></div>
       </div>
+    </section>
+  </main>
 
-      <div class="dato">
-        <strong>Modelo</strong>
-        <p>Modelo de referencia</p>
-      </div>
+  <!-- El canvas de Three.js solo se utiliza en dispositivos con WebXR -->
+  <div id="xr-canvas-container"></div>
 
-      <div class="dato">
-        <strong>Dimensiones</strong>
-        <p>8 × 4 × 1 m</p>
-      </div>
+  <!-- Esta interfaz aparece dentro de la sesión WebXR compatible (principalmente Android/Chrome) -->
+  <div id="xr-overlay">
+    <section id="ar-panel">
+      <h3>Enfardadora industrial</h3>
+      <p><strong>Fabricante:</strong> IM</p>
+      <p><strong>Dimensiones:</strong> 8 × 4 × 1 m</p>
+      <p><strong>Peso:</strong> 12.000 kg</p>
+      <p><strong>Potencia:</strong> 45 kW</p>
+      <p><strong>Capacidad:</strong> 15 t/h</p>
+      <div id="ar-status">Busca una superficie horizontal.</div>
+    </section>
 
-      <div class="dato">
-        <strong>Peso</strong>
-        <p>12.000 kg</p>
-      </div>
-
-      <div class="dato">
-        <strong>Potencia</strong>
-        <p>45 kW</p>
-      </div>
-
-      <div class="dato">
-        <strong>Capacidad</strong>
-        <p>15 t/h</p>
-      </div>
-
+    <div id="ar-controls">
+      <button id="moveButton" type="button">Mover máquina</button>
+      <button id="rotateLeft" type="button">↶ Girar</button>
+      <button id="rotateRight" type="button">Girar ↷</button>
+      <button id="exitAR" type="button">Salir de AR</button>
     </div>
   </div>
 
-</main>
-
-<!-- Canvas de Three.js -->
-
-<div id="xr-canvas-container"></div>
-
-<!-- Panel HTML dentro de AR -->
-
-<div id="xr-overlay">
-
-  <div id="ar-panel">
-    <h3>Enfardadora industrial</h3>
-
-    <p><strong>Fabricante:</strong> IMABE</p>
-    <p><strong>Dimensiones:</strong> 8 × 4 × 1 m</p>
-    <p><strong>Peso:</strong> 12.000 kg</p>
-    <p><strong>Potencia:</strong> 45 kW</p>
-    <p><strong>Capacidad:</strong> 15 t/h</p>
-
-    <div id="ar-status">
-      Busca una superficie horizontal.
-    </div>
-  </div>
-
-  <div id="ar-controls">
-
-    <button id="moveButton">
-      Mover máquina
-    </button>
-
-    <button id="rotateLeft">
-      ↶ Girar
-    </button>
-
-    <button id="rotateRight">
-      Girar ↷
-    </button>
-
-    <button id="exitAR">
-      Salir de AR
-    </button>
-
-  </div>
-
-</div>
-
-<script type="module">
-
-import * as THREE from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-
-// ======================================
-// 1. CONFIGURACIÓN
-// ======================================
-
-const MODEL_PATH = 'Maquina A prueba.glb';
-
-// El modelo debe estar exportado en metros.
-// Si el GLB está en milímetros, prueba 0.001.
-const MODEL_SCALE = 1;
-
-const preview = document.getElementById('preview');
-const startButton = document.getElementById('startAR');
-const pageStatus = document.getElementById('page-status');
-const overlay = document.getElementById('xr-overlay');
-const arStatus = document.getElementById('ar-status');
-
-const isIOS =
-  /iPhone|iPad|iPod/.test(navigator.userAgent) ||
-  (navigator.platform === 'MacIntel' &&
-   navigator.maxTouchPoints > 1);
-
-// ======================================
-// 2. ESCENA THREE.JS
-// ======================================
-
-const scene = new THREE.Scene();
-
-const camera = new THREE.PerspectiveCamera(
-  70,
-  window.innerWidth / window.innerHeight,
-  0.01,
-  100
-);
-
-const renderer = new THREE.WebGLRenderer({
-  alpha: true,
-  antialias: true
-});
-
-renderer.setPixelRatio(
-  Math.min(window.devicePixelRatio, 2)
-);
-
-renderer.setSize(
-  window.innerWidth,
-  window.innerHeight
-);
-
-renderer.xr.enabled = true;
-renderer.setClearColor(0x000000, 0);
-
-document
-  .getElementById('xr-canvas-container')
-  .appendChild(renderer.domElement);
-
-// Iluminación
-
-scene.add(new THREE.HemisphereLight(
-  0xffffff,
-  0x444444,
-  2
-));
-
-const light = new THREE.DirectionalLight(
-  0xffffff,
-  2
-);
-
-light.position.set(2, 5, 3);
-scene.add(light);
-
-// ======================================
-// 3. CARGA DEL MODELO
-// ======================================
-
-const machine = new THREE.Group();
-scene.add(machine);
-
-machine.visible = false;
-
-let modelReady = false;
-
-const loader = new GLTFLoader();
-
-loader.load(
-  MODEL_PATH,
-
-  (gltf) => {
-
-    const object = gltf.scene;
-
-    object.scale.setScalar(MODEL_SCALE);
-
-    // Calcula la parte inferior del modelo.
-    // Así lo apoyamos sobre el plano detectado.
-
-    const box = new THREE.Box3().setFromObject(object);
-
-    object.position.y -= box.min.y;
-
-    machine.add(object);
-
-    modelReady = true;
-
-    pageStatus.textContent =
-      'Modelo 3D cargado correctamente.';
-
-  },
-
-  undefined,
-
-  (error) => {
-
-    console.error(error);
-
-    pageStatus.textContent =
-      'Error al cargar el modelo GLB. Verifica su nombre y ubicación.';
-
-  }
-);
-
-// ======================================
-// 4. DETECCIÓN DEL DISPOSITIVO
-// ======================================
-
-let customARAvailable = false;
-
-async function configureDevice() {
-
-  if (isIOS) {
-
-    // iPhone: utilizar AR Quick Look.
-
-    preview.setAttribute('ar', '');
-    preview.setAttribute('ar-modes', 'quick-look');
-
-    pageStatus.textContent =
-      'iPhone detectado: utiliza el botón de realidad aumentada del visor. La ficha técnica está disponible en esta página.';
-
-    return;
-
-  }
-
-  if (
-    navigator.xr &&
-    await navigator.xr.isSessionSupported('immersive-ar')
-  ) {
-
-    customARAvailable = true;
-
-    startButton.hidden = false;
-
-    pageStatus.textContent =
-      'Dispositivo compatible con AR personalizada.';
-
-  } else {
-
-    // Alternativa para dispositivos sin WebXR.
-
-    preview.setAttribute('ar', '');
-    preview.setAttribute(
-      'ar-modes',
-      'scene-viewer quick-look'
-    );
-
-    pageStatus.textContent =
-      'Este navegador no admite la experiencia personalizada. Puedes utilizar el visor AR compatible del dispositivo.';
-
-  }
-
-}
-
-configureDevice();
-
-// ======================================
-// 5. VARIABLES DE AR
-// ======================================
-
-let hitTestSource = null;
-let reticle = null;
-let currentSession = null;
-
-let placed = false;
-let moveMode = false;
-let floorY = 0;
-
-// ======================================
-// 6. RETÍCULA DE DETECCIÓN
-// ======================================
-
-reticle = new THREE.Mesh(
-
-  new THREE.RingGeometry(0.12, 0.17, 32),
-
-  new THREE.MeshBasicMaterial({
-    color: 0x00ff66,
-    side: THREE.DoubleSide
-  })
-
-);
-
-reticle.rotation.x = -Math.PI / 2;
-reticle.visible = false;
-
-scene.add(reticle);
-
-// ======================================
-// 7. INICIAR AR
-// ======================================
-
-startButton.addEventListener('click', async () => {
-
-  if (!customARAvailable) return;
-
-  if (!modelReady) {
-
-    alert('El modelo 3D todavía se está cargando.');
-
-    return;
-
-  }
-
-  try {
-
-    pageStatus.textContent =
-      'Iniciando cámara y detección del suelo...';
-
-    const session = await navigator.xr.requestSession(
-      'immersive-ar',
-      {
-        requiredFeatures: [
-          'hit-test',
-          'dom-overlay'
-        ],
-
-        domOverlay: {
-          root: overlay
-        }
-      }
-    );
-
-    currentSession = session;
-
-    await renderer.xr.setSession(session);
-
-    // Espacio de referencia para el hit test.
-
-    const viewerSpace =
-      await session.requestReferenceSpace('viewer');
-
-    hitTestSource =
-      await session.requestHitTestSource({
-        space: viewerSpace
+  <!-- Control independiente del módulo Three.js: permite diagnosticar la carga del GLB -->
+  <script>
+    (() => {
+      const viewer = document.getElementById('preview');
+      const status = document.getElementById('page-status');
+      const nativeButton = document.getElementById('openNativeAR');
+
+      let modelLoaded = false;
+
+      viewer.addEventListener('progress', (event) => {
+        const progress = Math.round((event.detail?.totalProgress || 0) * 100);
+        status.textContent = `Cargando modelo 3D: ${progress}%`;
       });
 
-    // Reinicia la colocación.
+      viewer.addEventListener('load', () => {
+        modelLoaded = true;
+        status.textContent = 'Modelo 3D cargado correctamente.';
+        // Espera un ciclo para que model-viewer actualice sus capacidades AR.
+        requestAnimationFrame(() => {
+          nativeButton.hidden = !viewer.canActivateAR;
+          if (!viewer.canActivateAR) {
+            status.textContent += ' No se detectó un modo AR nativo en este navegador.';
+          }
+        });
+      });
 
-    placed = false;
-    moveMode = false;
+      viewer.addEventListener('error', (event) => {
+        status.textContent =
+          'Error al cargar el modelo 3D: ' +
+          (event.detail?.type || 'revisa la ruta y el archivo GLB');
+        console.error('Error de model-viewer:', event.detail);
+      });
 
-    machine.visible = false;
-
-    reticle.visible = false;
-
-    document.body.classList.add('in-ar');
-
-    arStatus.textContent =
-      'Mueve el teléfono para detectar el suelo. Cuando aparezca el círculo verde, toca la pantalla para colocar la máquina.';
-
-    // Detectar toques en la escena.
-
-    session.addEventListener('select', onSelect);
-
-    // Cerrar sesión.
-
-    session.addEventListener('end', onSessionEnd);
-
-    // Animación.
-
-    renderer.setAnimationLoop(renderAR);
-
-  } catch (error) {
-
-    console.error(error);
-
-    pageStatus.textContent =
-      'No se pudo iniciar AR. Comprueba que el navegador y el dispositivo sean compatibles y que hayas permitido el acceso a la cámara y al seguimiento del entorno.';
-
-    alert(
-      'No se pudo iniciar AR: ' + error.message
-    );
-
-  }
-
-});
-
-// ======================================
-// 8. DETECCIÓN DE SUPERFICIES
-// ======================================
-
-function renderAR(time, frame) {
-
-  if (frame && hitTestSource) {
-
-    const referenceSpace =
-      renderer.xr.getReferenceSpace();
-
-    const results =
-      frame.getHitTestResults(hitTestSource);
-
-    if (results.length > 0) {
-
-      const hit = results[0];
-
-      const pose = hit.getPose(referenceSpace);
-
-      if (pose) {
-
-        const quaternion =
-          new THREE.Quaternion().fromArray(
-            pose.transform.orientation
-          );
-
-        // Comprobar que la superficie sea horizontal.
-        // Se ignoran paredes y planos muy inclinados.
-
-        const normal = new THREE.Vector3(0, 1, 0)
-          .applyQuaternion(quaternion);
-
-        if (Math.abs(normal.y) > 0.85) {
-
-          reticle.position.fromArray(
-            pose.transform.position
-          );
-
-          reticle.quaternion.copy(quaternion);
-
-          reticle.visible = true;
-
-        } else {
-
-          reticle.visible = false;
-
+      nativeButton.addEventListener('click', async () => {
+        if (!modelLoaded) {
+          status.textContent = 'El modelo todavía está cargando.';
+          return;
         }
 
+        if (!viewer.canActivateAR) {
+          status.textContent = 'Este dispositivo o navegador no tiene un modo AR nativo disponible.';
+          return;
+        }
+
+        try {
+          // Debe ejecutarse directamente como consecuencia del toque del usuario.
+          await viewer.activateAR();
+        } catch (error) {
+          console.error('No se pudo activar AR nativa:', error);
+          status.textContent = `No se pudo abrir AR: ${error.message || error}`;
+        }
+      });
+
+      setTimeout(() => {
+        if (!modelLoaded) {
+          status.textContent =
+            'El modelo tarda más de lo esperado. Comprueba que el archivo GLB esté en la raíz del sitio y que el nombre coincida exactamente.';
+        }
+      }, 15000);
+    })();
+  </script>
+
+  <!-- WebXR personalizado. Si el módulo falla, el visor 3D/AR nativo sigue disponible. -->
+  <script type="module">
+    import * as THREE from 'three';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+    const MODEL_PATH = './Maquina%20A%20prueba.glb';
+    const MODEL_SCALE = 1; // Modelo exportado en metros. Si está en mm, usa 0.001.
+
+    const preview = document.getElementById('preview');
+    const startButton = document.getElementById('startAR');
+    const pageStatus = document.getElementById('page-status');
+    const overlay = document.getElementById('xr-overlay');
+    const arStatus = document.getElementById('ar-status');
+    const canvasContainer = document.getElementById('xr-canvas-container');
+
+    const isIOS =
+      /iPhone|iPad|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+    // iPhone/iPad utiliza AR Quick Look; Safari iOS no ejecuta esta experiencia WebXR personalizada.
+    if (!isIOS && navigator.xr) {
+      initializeWebXR();
+    } else if (isIOS) {
+      pageStatus.textContent =
+        'En iPhone/iPad utiliza el botón de realidad aumentada del visor. La ficha técnica permanece en esta página; Quick Look no admite este panel HTML personalizado.';
+    } else {
+      pageStatus.textContent =
+        'Este navegador no ofrece WebXR. Puedes probar el botón de AR nativa si el dispositivo lo admite.';
+    }
+
+    async function initializeWebXR() {
+      let supported = false;
+
+      try {
+        supported = await navigator.xr.isSessionSupported('immersive-ar');
+      } catch (error) {
+        console.warn('No fue posible consultar WebXR:', error);
       }
 
-    } else {
+      if (!supported) {
+        pageStatus.textContent =
+          'WebXR no está disponible en este dispositivo/navegador. Prueba la opción de AR nativa si aparece.';
+        return;
+      }
 
+      try {
+        setupThreeScene();
+      } catch (error) {
+        console.error('Error inicializando Three.js:', error);
+        pageStatus.textContent =
+          'No se pudo preparar la experiencia 3D personalizada. El visor 3D y la opción de AR nativa siguen disponibles.';
+      }
+    }
+
+    function setupThreeScene() {
+      const scene = new THREE.Scene();
+
+      const camera = new THREE.PerspectiveCamera(
+        70,
+        window.innerWidth / window.innerHeight,
+        0.01,
+        1000
+      );
+
+      const renderer = new THREE.WebGLRenderer({
+        alpha: true,
+        antialias: true,
+        powerPreference: 'high-performance'
+      });
+
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setClearColor(0x000000, 0);
+      renderer.xr.enabled = true;
+      renderer.xr.setReferenceSpaceType('local');
+      canvasContainer.appendChild(renderer.domElement);
+
+      scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 2));
+
+      const directionalLight = new THREE.DirectionalLight(0xffffff, 2);
+      directionalLight.position.set(2, 5, 3);
+      scene.add(directionalLight);
+
+      const machine = new THREE.Group();
+      machine.visible = false;
+      scene.add(machine);
+
+      let modelReady = false;
+      let currentSession = null;
+      let hitTestSource = null;
+      let reticle;
+      let placed = false;
+      let moveMode = false;
+      let floorY = 0;
+
+      const loader = new GLTFLoader();
+
+      loader.load(
+        MODEL_PATH,
+        (gltf) => {
+          const object = gltf.scene;
+          object.scale.setScalar(MODEL_SCALE);
+
+          // Alinea la parte inferior del modelo con el origen de la máquina.
+          object.updateMatrixWorld(true);
+          const bounds = new THREE.Box3().setFromObject(object);
+          object.position.y -= bounds.min.y;
+          object.updateMatrixWorld(true);
+
+          machine.add(object);
+          modelReady = true;
+          pageStatus.textContent =
+            'Modelo cargado. Puedes iniciar la experiencia AR personalizada.';
+          startButton.hidden = false;
+        },
+        (event) => {
+          if (event.total > 0) {
+            const percent = Math.round((event.loaded / event.total) * 100);
+            pageStatus.textContent = `Preparando modelo para AR: ${percent}%`;
+          }
+        },
+        (error) => {
+          console.error('Error cargando GLB en Three.js:', error);
+          pageStatus.textContent =
+            'El visor 3D puede funcionar, pero no se pudo cargar el modelo para AR personalizada. Revisa el nombre del GLB.';
+        }
+      );
+
+      reticle = new THREE.Mesh(
+        new THREE.RingGeometry(0.12, 0.17, 32),
+        new THREE.MeshBasicMaterial({
+          color: 0x00ff66,
+          side: THREE.DoubleSide
+        })
+      );
+      reticle.rotation.x = -Math.PI / 2;
       reticle.visible = false;
+      scene.add(reticle);
 
+      startButton.addEventListener('click', startCustomAR);
+
+      async function startCustomAR() {
+        if (!modelReady) {
+          pageStatus.textContent = 'El modelo todavía se está cargando para AR.';
+          return;
+        }
+
+        if (currentSession) return;
+
+        try {
+          startButton.disabled = true;
+          pageStatus.textContent = 'Iniciando cámara y detección de superficies...';
+
+          const session = await navigator.xr.requestSession('immersive-ar', {
+            requiredFeatures: ['hit-test'],
+            optionalFeatures: ['dom-overlay'],
+            domOverlay: { root: overlay }
+          });
+
+          currentSession = session;
+          await renderer.xr.setSession(session);
+
+          const viewerSpace = await session.requestReferenceSpace('viewer');
+          hitTestSource = await session.requestHitTestSource({ space: viewerSpace });
+
+          placed = false;
+          moveMode = false;
+          machine.visible = false;
+          reticle.visible = false;
+
+          document.body.classList.add('in-ar');
+
+          arStatus.textContent = session.domOverlayState
+            ? 'Mueve el teléfono lentamente para detectar el suelo. Cuando aparezca el círculo verde, toca para colocar la máquina.'
+            : 'AR está activa, pero este navegador no admite el panel HTML superpuesto. Busca el círculo verde y toca para colocar la máquina.';
+
+          session.addEventListener('select', onSelect);
+          session.addEventListener('end', onSessionEnd);
+
+          renderer.setAnimationLoop(renderAR);
+        } catch (error) {
+          console.error('Error iniciando WebXR:', error);
+          pageStatus.textContent =
+            `No se pudo iniciar AR personalizada: ${error.message || error}. Revisa permisos de cámara, HTTPS y compatibilidad con ARCore/WebXR.`;
+          startButton.disabled = false;
+        }
+      }
+
+      function renderAR(_time, frame) {
+        if (frame && hitTestSource) {
+          const referenceSpace = renderer.xr.getReferenceSpace();
+          const results = frame.getHitTestResults(hitTestSource);
+
+          if (results.length > 0) {
+            const pose = results[0].getPose(referenceSpace);
+
+            if (pose) {
+              const orientation = new THREE.Quaternion().fromArray(
+                pose.transform.orientation
+              );
+              const normal = new THREE.Vector3(0, 1, 0).applyQuaternion(orientation);
+
+              // Acepta superficies aproximadamente horizontales.
+              if (Math.abs(normal.y) > 0.85) {
+                reticle.position.fromArray(pose.transform.position);
+                reticle.quaternion.copy(orientation);
+                reticle.visible = true;
+              } else {
+                reticle.visible = false;
+              }
+            } else {
+              reticle.visible = false;
+            }
+          } else {
+            reticle.visible = false;
+          }
+        }
+
+        renderer.render(scene, camera);
+      }
+
+      function onSelect() {
+        if (!reticle.visible) {
+          arStatus.textContent = 'No se ha detectado una superficie horizontal. Mueve el teléfono lentamente.';
+          return;
+        }
+
+        if (!placed) {
+          machine.position.copy(reticle.position);
+          floorY = reticle.position.y;
+          machine.rotation.set(0, 0, 0);
+          machine.visible = true;
+          placed = true;
+          arStatus.textContent = 'Máquina colocada. Puedes moverla o girarla con los controles.';
+          return;
+        }
+
+        if (moveMode) {
+          machine.position.x = reticle.position.x;
+          machine.position.z = reticle.position.z;
+          machine.position.y = floorY;
+
+          moveMode = false;
+          document.getElementById('moveButton').textContent = 'Mover máquina';
+          arStatus.textContent = 'Máquina desplazada horizontalmente.';
+        }
+      }
+
+      document.getElementById('moveButton').addEventListener('click', () => {
+        if (!placed) {
+          arStatus.textContent = 'Primero debes colocar la máquina.';
+          return;
+        }
+
+        moveMode = !moveMode;
+        document.getElementById('moveButton').textContent =
+          moveMode ? 'Cancelar movimiento' : 'Mover máquina';
+
+        arStatus.textContent = moveMode
+          ? 'Apunta al nuevo lugar del suelo y toca la pantalla para mover la máquina.'
+          : 'Movimiento cancelado.';
+      });
+
+      document.getElementById('rotateLeft').addEventListener('click', () => {
+        if (placed) machine.rotation.y += Math.PI / 12;
+      });
+
+      document.getElementById('rotateRight').addEventListener('click', () => {
+        if (placed) machine.rotation.y -= Math.PI / 12;
+      });
+
+      document.getElementById('exitAR').addEventListener('click', () => {
+        if (currentSession) currentSession.end();
+      });
+
+      // Evita que tocar los controles HTML genere también una selección en el mundo AR.
+      overlay.addEventListener('beforexrselect', (event) => {
+        event.preventDefault();
+      });
+
+      function onSessionEnd() {
+        hitTestSource = null;
+        currentSession = null;
+        placed = false;
+        moveMode = false;
+        machine.visible = false;
+        reticle.visible = false;
+
+        document.body.classList.remove('in-ar');
+        renderer.setAnimationLoop(null);
+        startButton.disabled = false;
+        pageStatus.textContent = 'Sesión AR finalizada.';
+      }
+
+      window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      });
     }
-
-  }
-
-  renderer.render(scene, camera);
-
-}
-
-// ======================================
-// 9. COLOCAR Y MOVER LA MÁQUINA
-// ======================================
-
-function onSelect() {
-
-  if (!reticle.visible) {
-
-    arStatus.textContent =
-      'No se ha detectado una superficie horizontal.';
-
-    return;
-
-  }
-
-  if (!placed) {
-
-    // Primera colocación.
-
-    machine.position.copy(reticle.position);
-
-    floorY = reticle.position.y;
-
-    machine.rotation.y = 0;
-
-    machine.visible = true;
-
-    placed = true;
-
-    arStatus.textContent =
-      'Máquina colocada sobre el suelo. Puedes girarla o moverla.';
-
-    return;
-
-  }
-
-  if (moveMode) {
-
-    // Movimiento restringido al plano horizontal.
-    // La coordenada vertical nunca cambia.
-
-    machine.position.x = reticle.position.x;
-
-    machine.position.z = reticle.position.z;
-
-    machine.position.y = floorY;
-
-    moveMode = false;
-
-    document.getElementById('moveButton').textContent =
-      'Mover máquina';
-
-    arStatus.textContent =
-      'Máquina desplazada y mantenida sobre el plano original.';
-
-  }
-
-}
-
-// ======================================
-// 10. CONTROLES
-// ======================================
-
-document.getElementById('moveButton')
-  .addEventListener('click', () => {
-
-    if (!placed) {
-
-      arStatus.textContent =
-        'Primero debes colocar la máquina.';
-
-      return;
-
-    }
-
-    moveMode = !moveMode;
-
-    document.getElementById('moveButton').textContent =
-      moveMode ? 'Cancelar movimiento' : 'Mover máquina';
-
-    arStatus.textContent = moveMode
-      ? 'Apunta al nuevo lugar del suelo y toca la pantalla para mover la máquina.'
-      : 'Movimiento cancelado.';
-
-  });
-
-// Rotación izquierda.
-
-document.getElementById('rotateLeft')
-  .addEventListener('click', () => {
-
-    if (placed) {
-      machine.rotation.y += Math.PI / 12;
-    }
-
-  });
-
-// Rotación derecha.
-
-document.getElementById('rotateRight')
-  .addEventListener('click', () => {
-
-    if (placed) {
-      machine.rotation.y -= Math.PI / 12;
-    }
-
-  });
-
-// Salir de AR.
-
-document.getElementById('exitAR')
-  .addEventListener('click', () => {
-
-    if (currentSession) {
-      currentSession.end();
-    }
-
-  });
-
-// Evitar que los botones del panel generen
-// selecciones involuntarias en el mundo AR.
-
-overlay.addEventListener('beforexrselect', (event) => {
-
-  event.preventDefault();
-
-});
-
-// ======================================
-// 11. CERRAR SESIÓN
-// ======================================
-
-function onSessionEnd() {
-
-  hitTestSource = null;
-
-  currentSession = null;
-
-  placed = false;
-  moveMode = false;
-
-  machine.visible = false;
-
-  reticle.visible = false;
-
-  document.body.classList.remove('in-ar');
-
-  renderer.setAnimationLoop(null);
-
-  startButton.hidden = false;
-
-  pageStatus.textContent =
-    'Sesión AR finalizada.';
-
-}
-
-// ======================================
-// 12. AJUSTE DE PANTALLA
-// ======================================
-
-window.addEventListener('resize', () => {
-
-  camera.aspect =
-    window.innerWidth / window.innerHeight;
-
-  camera.updateProjectionMatrix();
-
-  renderer.setSize(
-    window.innerWidth,
-    window.innerHeight
-  );
-
-});
-
-</script>
-
+  </script>
 </body>
 </html>
