@@ -5,10 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover">
   <title>Visor AR Híbrido - Industrial</title>
 
-  <!-- Librería para iOS (Model-Viewer) -->
   <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/4.0.0/model-viewer.min.js"></script>
 
-  <!-- Librerías para Android (Three.js para WebXR) -->
   <script type="importmap">
     {
       "imports": {
@@ -21,25 +19,36 @@
   <style>
     body { margin: 0; font-family: sans-serif; background: #f1efe9; overflow: hidden; }
     
-    /* Contenedores de Interfaz */
     #ios-container, #android-container { display: none; width: 100vw; height: 100vh; }
     
-    /* Estilos de iOS */
+    /* iOS */
     model-viewer { width: 100%; height: 100%; }
     .ios-menu { position: absolute; bottom: 30px; left: 0; right: 0; display: flex; justify-content: center; gap: 10px; z-index: 10; }
     .btn { padding: 12px 20px; background: #1f2328; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
     
-    /* Estilos de Android */
-    #android-menu { position: absolute; bottom: 80px; left: 0; right: 0; display: flex; justify-content: center; gap: 10px; z-index: 10; }
-    .btn-android { padding: 12px 20px; background: #f2b705; color: #1f2328; border: none; border-radius: 8px; font-weight: bold; }
-    #android-status { position: absolute; top: 20px; left: 20px; right: 20px; text-align: center; background: rgba(0,0,0,0.7); color: white; padding: 10px; border-radius: 8px; z-index: 10; }
+    /* Android */
+    #android-menu { position: absolute; bottom: 80px; left: 0; right: 0; display: flex; justify-content: center; gap: 10px; z-index: 10; pointer-events: none; }
+    .btn-android { pointer-events: auto; padding: 12px 20px; background: #f2b705; color: #1f2328; border: none; border-radius: 8px; font-weight: bold; }
+    #android-status { position: absolute; top: 20px; left: 20px; right: 20px; text-align: center; background: rgba(0,0,0,0.7); color: white; padding: 10px; border-radius: 8px; z-index: 10; pointer-events: none; }
+    
+    /* Panel de Control AR Android */
+    #android-controls {
+      display: none;
+      position: absolute;
+      top: 70px; left: 20px; right: 20px;
+      background: rgba(31, 35, 40, 0.9);
+      padding: 15px; border-radius: 12px;
+      color: white; z-index: 10;
+      pointer-events: auto; /* Permite tocar los sliders sin que se ponga otro objeto */
+    }
+    #android-controls label { font-size: 14px; font-weight: bold; display: block; margin-bottom: 5px; }
+    #android-controls input { width: 100%; margin-bottom: 15px; }
+    #btn-borrar { width: 100%; padding: 10px; background: #e74c3c; color: white; border: none; border-radius: 6px; font-weight: bold; }
   </style>
 </head>
 <body>
 
-  <!-- =============================== -->
-  <!-- EXPERIENCIA iOS (MODEL VIEWER)  -->
-  <!-- =============================== -->
+  <!-- iOS -->
   <div id="ios-container">
     <model-viewer id="mv-ios" src="conjunto.glb" ar ar-modes="quick-look" ar-scale="fixed" camera-controls shadow-intensity="1">
       <button slot="ar-button" class="btn" style="position:absolute; top:20px; right:20px;">Abrir en AR (iOS)</button>
@@ -50,16 +59,24 @@
     </div>
   </div>
 
-  <!-- =============================== -->
-  <!-- EXPERIENCIA ANDROID (THREE.JS)  -->
-  <!-- =============================== -->
+  <!-- ANDROID -->
   <div id="android-container">
-    <div id="android-status">Iniciando motor AR para Android...</div>
+    <div id="android-status">Iniciando motor AR...</div>
+    
+    <div id="android-controls">
+      <label>Escala: <span id="val-escala">1</span>x</label>
+      <input type="range" id="slider-escala" min="0.01" max="2" step="0.01" value="1">
+      
+      <label>Rotación</label>
+      <input type="range" id="slider-rotacion" min="0" max="360" step="1" value="0">
+      
+      <button id="btn-borrar">Borrar último (Reubicar)</button>
+    </div>
+
     <div id="android-menu">
       <button class="btn-android" id="btn-maquina">Poner Máquina</button>
       <button class="btn-android" id="btn-fardo">Poner Fardo</button>
     </div>
-    <!-- Aquí Three.js inyectará su botón de AR y su Canvas (Cámara) -->
   </div>
 
   <script type="module">
@@ -67,30 +84,31 @@
     import { ARButton } from 'three/addons/webxr/ARButton.js';
     import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
-    // 1. DETECCIÓN DE SISTEMA OPERATIVO
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 
     if (isIOS) {
-      // Mostrar la interfaz de iOS y ocultar Android
       document.getElementById('ios-container').style.display = 'block';
     } else {
-      // Mostrar la interfaz de Android y configurar WebXR
       document.getElementById('android-container').style.display = 'block';
       initAndroidAR();
     }
 
-    // 2. LÓGICA DE ANDROID (WEBXR CON THREE.JS)
     function initAndroidAR() {
       let container, camera, scene, renderer, reticle;
-      let hitTestSource = null;
-      let hitTestSourceRequested = false;
-      
-      // Variables para los modelos separados
+      let hitTestSource = null, hitTestSourceRequested = false;
       let loader = new GLTFLoader();
+      
       let maquinaModelo, fardoModelo;
-      let modeloSeleccionado = null; // Qué objeto va a colocar el usuario
+      let modeloSeleccionado = null; 
+      
+      // Control de objetos puestos
+      let objetosColocados = [];
+      let ultimoObjeto = null;
 
       const status = document.getElementById('android-status');
+      const controlsPanel = document.getElementById('android-controls');
+      const sliderEscala = document.getElementById('slider-escala');
+      const sliderRotacion = document.getElementById('slider-rotacion');
 
       init();
       animate();
@@ -100,50 +118,48 @@
         scene = new THREE.Scene();
         camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
 
-        // Iluminación
         const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
         light.position.set(0.5, 1, 0.25);
         scene.add(light);
 
-        // Configuración del motor de render
         renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
         renderer.setPixelRatio(window.devicePixelRatio);
         renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.xr.enabled = true; // Activar Realidad Aumentada
+        renderer.xr.enabled = true; 
         container.appendChild(renderer.domElement);
 
-        // Inyectar el botón nativo de WebXR
-        const arButton = ARButton.createButton(renderer, { requiredFeatures: ['hit-test'] });
-        arButton.style.bottom = '150px'; // Subir el botón para que no tape el menú
+        // Habilitar DOM Overlay para que los botones y sliders funcionen en AR
+        const arButton = ARButton.createButton(renderer, { 
+          requiredFeatures: ['hit-test'],
+          optionalFeatures: ['dom-overlay'],
+          domOverlay: { root: document.body }
+        });
+        arButton.style.bottom = '150px'; 
         document.body.appendChild(arButton);
 
-        // Precargar modelos individuales (Asegúrate de que existan estos archivos)
-        loader.load('Maquina A prueba.glb', function (gltf) {
+        loader.load('Maquina A prueba.glb', (gltf) => {
           maquinaModelo = gltf.scene;
-          status.innerText = "Máquina cargada. Selecciona un objeto.";
-          modeloSeleccionado = maquinaModelo; // Por defecto
+          status.innerText = "Máquina cargada. Selecciona y apunta al suelo.";
+          modeloSeleccionado = maquinaModelo;
         });
         
-        loader.load('Fardo.glb', function (gltf) {
+        loader.load('Fardo.glb', (gltf) => {
           fardoModelo = gltf.scene;
         });
 
-        // Configurar botones de selección
         document.getElementById('btn-maquina').addEventListener('click', () => { 
           modeloSeleccionado = maquinaModelo; 
-          status.innerText = "Máquina seleccionada. Toca la pantalla para ponerla.";
+          status.innerText = "Máquina seleccionada. Toca para poner.";
         });
         document.getElementById('btn-fardo').addEventListener('click', () => { 
           modeloSeleccionado = fardoModelo; 
-          status.innerText = "Fardo seleccionado. Toca la pantalla para ponerlo.";
+          status.innerText = "Fardo seleccionado. Toca para poner.";
         });
 
-        // Evento al tocar la pantalla en AR (Instanciar el objeto)
         const controller = renderer.xr.getController(0);
         controller.addEventListener('select', onSelect);
         scene.add(controller);
 
-        // Crear el "Retículo" (el círculo que flota en el piso para apuntar)
         reticle = new THREE.Mesh(
           new THREE.RingGeometry(0.15, 0.2, 32).rotateX(-Math.PI / 2),
           new THREE.MeshBasicMaterial({ color: 0xf2b705 })
@@ -151,47 +167,78 @@
         reticle.matrixAutoUpdate = false;
         reticle.visible = false;
         scene.add(reticle);
+
+        // Eventos del Panel de Control
+        sliderEscala.addEventListener('input', (e) => {
+          const v = e.target.value;
+          document.getElementById('val-escala').innerText = v;
+          if(ultimoObjeto) ultimoObjeto.scale.set(v, v, v);
+        });
+
+        sliderRotacion.addEventListener('input', (e) => {
+          if(ultimoObjeto) ultimoObjeto.rotation.y = e.target.value * (Math.PI / 180);
+        });
+
+        document.getElementById('btn-borrar').addEventListener('click', () => {
+          if(ultimoObjeto) {
+            scene.remove(ultimoObjeto);
+            objetosColocados.pop();
+            ultimoObjeto = objetosColocados.length > 0 ? objetosColocados[objetosColocados.length - 1] : null;
+            
+            if(!ultimoObjeto) {
+              controlsPanel.style.display = 'none';
+              status.innerText = "Toca la pantalla para colocar otro objeto.";
+            } else {
+              // Recuperar valores del objeto anterior si queda alguno
+              sliderEscala.value = ultimoObjeto.scale.x;
+              document.getElementById('val-escala').innerText = ultimoObjeto.scale.x.toFixed(2);
+            }
+          }
+        });
       }
 
-      // Función que coloca el modelo en el mundo real
-      function onSelect() {
+      function onSelect(event) {
+        // Evitar poner objetos si el usuario tocó un botón o slider de la interfaz
+        if (event.target !== renderer.xr.getController(0)) return;
+
         if (reticle.visible && modeloSeleccionado) {
           const clone = modeloSeleccionado.clone();
           clone.position.setFromMatrixPosition(reticle.matrix);
+          
+          // Reiniciar controles para el nuevo objeto
+          sliderEscala.value = 1;
+          sliderRotacion.value = 0;
+          document.getElementById('val-escala').innerText = "1";
+          
           scene.add(clone);
-          status.innerText = "¡Objeto colocado!";
+          objetosColocados.push(clone);
+          ultimoObjeto = clone;
+          
+          controlsPanel.style.display = 'block';
+          status.innerText = "Objeto colocado. Ajusta escala o rotación.";
         }
       }
 
-      function animate() {
-        renderer.setAnimationLoop(render);
-      }
+      function animate() { renderer.setAnimationLoop(render); }
 
-      // Motor físico y detección del suelo (Hit-Test)
       function render(timestamp, frame) {
         if (frame) {
           const referenceSpace = renderer.xr.getReferenceSpace();
           const session = renderer.xr.getSession();
 
           if (hitTestSourceRequested === false) {
-            session.requestReferenceSpace('viewer').then(function (referenceSpace) {
-              session.requestHitTestSource({ space: referenceSpace }).then(function (source) {
-                hitTestSource = source;
-              });
+            session.requestReferenceSpace('viewer').then((referenceSpace) => {
+              session.requestHitTestSource({ space: referenceSpace }).then((source) => { hitTestSource = source; });
             });
-            session.addEventListener('end', function () {
-              hitTestSourceRequested = false;
-              hitTestSource = null;
-            });
+            session.addEventListener('end', () => { hitTestSourceRequested = false; hitTestSource = null; controlsPanel.style.display = 'none'; });
             hitTestSourceRequested = true;
           }
 
           if (hitTestSource) {
             const hitTestResults = frame.getHitTestResults(hitTestSource);
             if (hitTestResults.length > 0) {
-              const hit = hitTestResults[0];
               reticle.visible = true;
-              reticle.matrix.fromArray(hit.getPose(referenceSpace).transform.matrix);
+              reticle.matrix.fromArray(hitTestResults[0].getPose(referenceSpace).transform.matrix);
             } else {
               reticle.visible = false;
             }
