@@ -3,282 +3,92 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover">
-  <title>Visor AR Híbrido - Industrial</title>
+  <title>Visor AR - Industrial</title>
 
+  <!-- Importar model-viewer de Google -->
   <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/4.0.0/model-viewer.min.js"></script>
 
-  <script type="importmap">
-    {
-      "imports": {
-        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
-      }
-    }
-  </script>
-
   <style>
-    body { margin: 0; font-family: sans-serif; background: #f1efe9; overflow: hidden; }
-    
-    #ios-container, #android-container { display: none; width: 100vw; height: 100vh; }
-    
-    /* === ESTILOS iOS === */
-    model-viewer { width: 100%; height: 100%; }
-    .ios-menu { position: absolute; bottom: 30px; left: 0; right: 0; display: flex; justify-content: center; gap: 10px; z-index: 10; }
-    .btn { padding: 12px 20px; background: #1f2328; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
-    
-    /* === ESTILOS ANDROID === */
-    /* El status en la parte superior izquierda */
-    #android-status { 
-      position: absolute; top: 20px; left: 20px; max-width: 60%;
-      background: rgba(0,0,0,0.7); color: white; padding: 10px 15px; 
-      border-radius: 8px; z-index: 10; pointer-events: none; font-size: 14px;
+    body { 
+      margin: 0; 
+      font-family: sans-serif; 
+      background: #f1efe9; 
+      overflow: hidden; 
+      height: 100vh; 
+      width: 100vw; 
     }
     
-    /* Controles superiores derechos (Escala y Borrar) */
-    #android-controls {
-      position: absolute; top: 20px; right: 20px;
-      display: flex; flex-direction: column; gap: 10px;
-      z-index: 10; pointer-events: none; /* Permite toques en el espacio vacío */
+    model-viewer { 
+      width: 100%; 
+      height: 100%; 
     }
-    .control-btn {
-      pointer-events: auto; /* Reactiva el toque solo en los botones */
-      padding: 12px 15px; background: rgba(31, 35, 40, 0.9); color: white; 
-      border: 1px solid #5f6368; border-radius: 8px; font-weight: bold; cursor: pointer;
+    
+    /* Menú inferior para cambiar de escala */
+    .menu-escala { 
+      position: absolute; 
+      bottom: 40px; 
+      left: 0; 
+      right: 0; 
+      display: flex; 
+      justify-content: center; 
+      gap: 15px; 
+      z-index: 10; 
     }
-    #btn-borrar { background: #e74c3c; border-color: #c0392b; }
+    
+    .btn { 
+      padding: 15px 25px; 
+      background: #1f2328; 
+      color: white; 
+      border: 2px solid #f2b705; 
+      border-radius: 8px; 
+      font-weight: bold; 
+      font-size: 16px;
+      cursor: pointer; 
+      box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+    }
+    
+    .btn:active {
+      background: #f2b705;
+      color: #1f2328;
+    }
 
-    /* Menú inferior (Selección de objetos) */
-    #android-menu { 
-      position: absolute; bottom: 80px; left: 0; right: 0; 
-      display: flex; justify-content: center; gap: 10px; z-index: 10; pointer-events: none; 
+    /* Botón de AR personalizado */
+    .ar-button {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      padding: 12px 20px;
+      background: #f2b705;
+      color: #1f2328;
+      border: none;
+      border-radius: 8px;
+      font-weight: bold;
+      cursor: pointer;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.3);
     }
-    .btn-android { 
-      pointer-events: auto; padding: 12px 20px; background: #f2b705; color: #1f2328; 
-      border: none; border-radius: 8px; font-weight: bold; cursor: pointer; 
-    }
-    .btn-android.active { background: #1f2328; color: white; border: 2px solid #f2b705; }
   </style>
 </head>
 <body>
 
-  <!-- ================== iOS ================== -->
-  <div id="ios-container">
-    <model-viewer id="mv-ios" src="conjunto.glb" ar ar-modes="quick-look" ar-scale="fixed" camera-controls shadow-intensity="1">
-      <button slot="ar-button" class="btn" style="position:absolute; top:20px; right:20px;">Abrir en AR (iOS)</button>
-    </model-viewer>
-    <div class="ios-menu">
-      <button class="btn" onclick="document.getElementById('mv-ios').src='conjunto.glb'">Escala 1:1</button>
-      <button class="btn" onclick="document.getElementById('mv-ios').src='conjunto_1a60.glb'">Escala 1:60</button>
-    </div>
-  </div>
-
-  <!-- ================ ANDROID ================ -->
-  <div id="android-container">
-    <div id="android-status">Cargando modelos...</div>
+  <!-- Visor unificado: ar-modes asegura compatibilidad con Android (scene-viewer) y iOS (quick-look) -->
+  <model-viewer 
+    id="mv-visor" 
+    src="conjunto.glb" 
+    ar 
+    ar-modes="webxr scene-viewer quick-look" 
+    camera-controls 
+    shadow-intensity="1">
     
-    <div id="android-controls">
-      <button id="btn-toggle-escala" class="control-btn">Escala: 1:1</button>
-      <button id="btn-borrar" class="control-btn">Borrar último</button>
-    </div>
+    <button slot="ar-button" class="ar-button">
+      Abrir en AR
+    </button>
+  </model-viewer>
 
-    <div id="android-menu">
-      <button class="btn-android" id="btn-maquina">Poner Máquina</button>
-      <button class="btn-android" id="btn-fardo">Poner Fardo</button>
-    </div>
+  <!-- Botones que cambian el archivo 3D a visualizar -->
+  <div class="menu-escala">
+    <button class="btn" onclick="document.getElementById('mv-visor').src='conjunto.glb'">Escala 1:1</button>
+    <button class="btn" onclick="document.getElementById('mv-visor').src='conjunto_1a60.glb'">Escala 1:60</button>
   </div>
 
-  <script type="module">
-    import * as THREE from 'three';
-    import { ARButton } from 'three/addons/webxr/ARButton.js';
-    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-
-    if (isIOS) {
-      document.getElementById('ios-container').style.display = 'block';
-    } else {
-      document.getElementById('android-container').style.display = 'block';
-      initAndroidAR();
-    }
-
-    function initAndroidAR() {
-      let container, camera, scene, renderer, reticle;
-      let hitTestSource = null, hitTestSourceRequested = false;
-      let loader = new GLTFLoader();
-      
-      let maquinaModelo, fardoModelo;
-      let modeloSeleccionado = null; 
-      
-      // Variables de control de estado
-      let objetosColocados = [];
-      let maquinaColocada = false; // Solo permite 1 máquina
-      let escalaActual = 1;        // Por defecto 1:1
-
-      const status = document.getElementById('android-status');
-      const btnToggleEscala = document.getElementById('btn-toggle-escala');
-      const btnMaquina = document.getElementById('btn-maquina');
-      const btnFardo = document.getElementById('btn-fardo');
-
-      init();
-      animate();
-
-      function init() {
-        container = document.getElementById('android-container');
-        scene = new THREE.Scene();
-        camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
-
-        const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
-        light.position.set(0.5, 1, 0.25);
-        scene.add(light);
-
-        renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-        renderer.setPixelRatio(window.devicePixelRatio);
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.xr.enabled = true; 
-        container.appendChild(renderer.domElement);
-
-        // dom-overlay permite que los botones HTML funcionen encima de la cámara 3D
-        const arButton = ARButton.createButton(renderer, { 
-          requiredFeatures: ['hit-test'],
-          optionalFeatures: ['dom-overlay'],
-          domOverlay: { root: document.body }
-        });
-        arButton.style.bottom = '150px'; 
-        document.body.appendChild(arButton);
-
-        // SOLUCIÓN DEFINITIVA A LOS TOQUES FANTASMA
-        // Bloquea el evento "select" de AR si el usuario tocó un botón de la interfaz
-        const menus = [document.getElementById('android-controls'), document.getElementById('android-menu')];
-        menus.forEach(menu => {
-          menu.addEventListener('beforexrselect', (ev) => ev.preventDefault());
-        });
-
-        // Carga de modelos
-        loader.load('Maquina A prueba.glb', (gltf) => {
-          maquinaModelo = gltf.scene;
-          modeloSeleccionado = maquinaModelo;
-          btnMaquina.classList.add('active');
-          status.innerText = "Apunta al suelo y toca para poner la máquina.";
-        });
-        
-        loader.load('Fardo.glb', (gltf) => {
-          fardoModelo = gltf.scene;
-        });
-
-        // Botones de selección inferior
-        btnMaquina.addEventListener('click', () => { 
-          modeloSeleccionado = maquinaModelo;
-          btnMaquina.classList.add('active');
-          btnFardo.classList.remove('active');
-          status.innerText = maquinaColocada ? "Ya hay una máquina puesta." : "Máquina lista para colocar.";
-        });
-        
-        btnFardo.addEventListener('click', () => { 
-          modeloSeleccionado = fardoModelo; 
-          btnFardo.classList.add('active');
-          btnMaquina.classList.remove('active');
-          status.innerText = "Fardo listo para colocar.";
-        });
-
-        // Botón de Escala Global
-        btnToggleEscala.addEventListener('click', () => {
-          escalaActual = (escalaActual === 1) ? (1/60) : 1;
-          btnToggleEscala.innerText = (escalaActual === 1) ? "Escala: 1:1" : "Escala: 1:60";
-          
-          // Cambia el tamaño de TODOS los objetos ya colocados instantáneamente
-          objetosColocados.forEach(obj => {
-            obj.scale.set(escalaActual, escalaActual, escalaActual);
-          });
-        });
-
-        // Botón Borrar Último
-        document.getElementById('btn-borrar').addEventListener('click', () => {
-          if (objetosColocados.length > 0) {
-            const ultimo = objetosColocados.pop(); // Saca el último del arreglo
-            scene.remove(ultimo); // Lo borra de la vista 3D
-            
-            // Si el objeto borrado era la máquina, permitimos poner otra
-            if (ultimo.userData.tipo === 'maquina') {
-              maquinaColocada = false;
-            }
-            status.innerText = "Objeto borrado.";
-          } else {
-            status.innerText = "No hay objetos para borrar.";
-          }
-        });
-
-        // Evento al tocar la pantalla para colocar objetos
-        const controller = renderer.xr.getController(0);
-        controller.addEventListener('select', onSelect);
-        scene.add(controller);
-
-        // Retículo (Aro amarillo en el piso)
-        reticle = new THREE.Mesh(
-          new THREE.RingGeometry(0.15, 0.2, 32).rotateX(-Math.PI / 2),
-          new THREE.MeshBasicMaterial({ color: 0xf2b705 })
-        );
-        reticle.matrixAutoUpdate = false;
-        reticle.visible = false;
-        scene.add(reticle);
-      }
-
-      function onSelect() {
-        if (!reticle.visible || !modeloSeleccionado) return;
-
-        const esMaquina = (modeloSeleccionado === maquinaModelo);
-
-        // LÓGICA MÁQUINA ÚNICA: Evita poner si ya existe
-        if (esMaquina && maquinaColocada) {
-          status.innerText = "Solo puedes tener 1 máquina. Bórrala para reubicarla.";
-          return;
-        }
-
-        const clone = modeloSeleccionado.clone();
-        clone.position.setFromMatrixPosition(reticle.matrix);
-        
-        // Aplica la escala global actual al nuevo objeto
-        clone.scale.set(escalaActual, escalaActual, escalaActual);
-        
-        // Guarda un identificador interno para saber qué objeto es al borrarlo
-        clone.userData.tipo = esMaquina ? 'maquina' : 'fardo';
-        
-        scene.add(clone);
-        objetosColocados.push(clone);
-        
-        // Bloquear futura colocación de máquina
-        if (esMaquina) maquinaColocada = true;
-
-        status.innerText = esMaquina ? "Máquina colocada." : "Fardo colocado.";
-      }
-
-      function animate() { renderer.setAnimationLoop(render); }
-
-      function render(timestamp, frame) {
-        if (frame) {
-          const referenceSpace = renderer.xr.getReferenceSpace();
-          const session = renderer.xr.getSession();
-
-          if (hitTestSourceRequested === false) {
-            session.requestReferenceSpace('viewer').then((referenceSpace) => {
-              session.requestHitTestSource({ space: referenceSpace }).then((source) => { hitTestSource = source; });
-            });
-            session.addEventListener('end', () => { hitTestSourceRequested = false; hitTestSource = null; });
-            hitTestSourceRequested = true;
-          }
-
-          if (hitTestSource) {
-            const hitTestResults = frame.getHitTestResults(hitTestSource);
-            if (hitTestResults.length > 0) {
-              reticle.visible = true;
-              reticle.matrix.fromArray(hitTestResults[0].getPose(referenceSpace).transform.matrix);
-            } else {
-              reticle.visible = false;
-            }
-          }
-        }
-        renderer.render(scene, camera);
-      }
-    }
-  </script>
 </body>
 </html>
