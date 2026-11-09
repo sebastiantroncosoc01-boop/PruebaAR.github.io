@@ -27,8 +27,9 @@
     .btn { padding: 12px 20px; background: #1f2328; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
     
     /* Android */
+    /* pointer-events: none; evita que la capa invisible bloquee los toques a la cámara AR */
     #android-menu { position: absolute; bottom: 80px; left: 0; right: 0; display: flex; justify-content: center; gap: 10px; z-index: 10; pointer-events: none; }
-    .btn-android { pointer-events: auto; padding: 12px 20px; background: #f2b705; color: #1f2328; border: none; border-radius: 8px; font-weight: bold; }
+    .btn-android { pointer-events: auto; padding: 12px 20px; background: #f2b705; color: #1f2328; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
     #android-status { position: absolute; top: 20px; left: 20px; right: 20px; text-align: center; background: rgba(0,0,0,0.7); color: white; padding: 10px; border-radius: 8px; z-index: 10; pointer-events: none; }
     
     /* Panel de Control AR Android */
@@ -39,11 +40,16 @@
       background: rgba(31, 35, 40, 0.9);
       padding: 15px; border-radius: 12px;
       color: white; z-index: 10;
-      pointer-events: auto; /* Permite tocar los sliders sin que se ponga otro objeto */
+      pointer-events: auto; 
     }
-    #android-controls label { font-size: 14px; font-weight: bold; display: block; margin-bottom: 5px; }
+    #android-controls label { font-size: 14px; font-weight: bold; display: block; margin-bottom: 8px; }
+    
+    .escala-container { display: flex; gap: 10px; margin-bottom: 15px; }
+    .btn-escala { flex: 1; padding: 10px; background: #3b4252; color: white; border: 1px solid #5f6368; border-radius: 6px; font-weight: bold; cursor: pointer; }
+    .btn-escala.active { background: #f2b705; color: #1f2328; }
+    
     #android-controls input { width: 100%; margin-bottom: 15px; }
-    #btn-borrar { width: 100%; padding: 10px; background: #e74c3c; color: white; border: none; border-radius: 6px; font-weight: bold; }
+    #btn-borrar { width: 100%; padding: 12px; background: #e74c3c; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; margin-top: 5px; }
   </style>
 </head>
 <body>
@@ -64,13 +70,16 @@
     <div id="android-status">Iniciando motor AR...</div>
     
     <div id="android-controls">
-      <label>Escala: <span id="val-escala">1</span>x</label>
-      <input type="range" id="slider-escala" min="0.01" max="2" step="0.01" value="1">
+      <label>Escala del objeto:</label>
+      <div class="escala-container">
+        <button id="btn-esc-1a1" class="btn-escala active">1:1</button>
+        <button id="btn-esc-1a60" class="btn-escala">1:60</button>
+      </div>
       
-      <label>Rotación</label>
+      <label>Rotar objeto</label>
       <input type="range" id="slider-rotacion" min="0" max="360" step="1" value="0">
       
-      <button id="btn-borrar">Borrar último (Reubicar)</button>
+      <button id="btn-borrar">Borrar último</button>
     </div>
 
     <div id="android-menu">
@@ -101,14 +110,14 @@
       let maquinaModelo, fardoModelo;
       let modeloSeleccionado = null; 
       
-      // Control de objetos puestos
       let objetosColocados = [];
       let ultimoObjeto = null;
 
       const status = document.getElementById('android-status');
       const controlsPanel = document.getElementById('android-controls');
-      const sliderEscala = document.getElementById('slider-escala');
       const sliderRotacion = document.getElementById('slider-rotacion');
+      const btnEsc1a1 = document.getElementById('btn-esc-1a1');
+      const btnEsc1a60 = document.getElementById('btn-esc-1a60');
 
       init();
       animate();
@@ -128,7 +137,6 @@
         renderer.xr.enabled = true; 
         container.appendChild(renderer.domElement);
 
-        // Habilitar DOM Overlay para que los botones y sliders funcionen en AR
         const arButton = ARButton.createButton(renderer, { 
           requiredFeatures: ['hit-test'],
           optionalFeatures: ['dom-overlay'],
@@ -136,6 +144,14 @@
         });
         arButton.style.bottom = '150px'; 
         document.body.appendChild(arButton);
+
+        // --- SOLUCIÓN: BLOQUEAR TOQUES FALSOS ---
+        // Evita que tocar un botón ponga un objeto en la pantalla AR
+        document.body.addEventListener('beforexrselect', (ev) => {
+          if (ev.target.closest('#android-controls') || ev.target.closest('#android-menu')) {
+            ev.preventDefault();
+          }
+        });
 
         loader.load('Maquina A prueba.glb', (gltf) => {
           maquinaModelo = gltf.scene;
@@ -149,11 +165,11 @@
 
         document.getElementById('btn-maquina').addEventListener('click', () => { 
           modeloSeleccionado = maquinaModelo; 
-          status.innerText = "Máquina seleccionada. Toca para poner.";
+          status.innerText = "Máquina seleccionada. Toca el suelo para ponerla.";
         });
         document.getElementById('btn-fardo').addEventListener('click', () => { 
           modeloSeleccionado = fardoModelo; 
-          status.innerText = "Fardo seleccionado. Toca para poner.";
+          status.innerText = "Fardo seleccionado. Toca el suelo para ponerlo.";
         });
 
         const controller = renderer.xr.getController(0);
@@ -168,11 +184,22 @@
         reticle.visible = false;
         scene.add(reticle);
 
-        // Eventos del Panel de Control
-        sliderEscala.addEventListener('input', (e) => {
-          const v = e.target.value;
-          document.getElementById('val-escala').innerText = v;
-          if(ultimoObjeto) ultimoObjeto.scale.set(v, v, v);
+        // --- CONTROLES DEL PANEL ---
+
+        btnEsc1a1.addEventListener('click', () => {
+          if(ultimoObjeto) {
+            ultimoObjeto.scale.set(1, 1, 1);
+            btnEsc1a1.classList.add('active');
+            btnEsc1a60.classList.remove('active');
+          }
+        });
+
+        btnEsc1a60.addEventListener('click', () => {
+          if(ultimoObjeto) {
+            ultimoObjeto.scale.set(1/60, 1/60, 1/60);
+            btnEsc1a60.classList.add('active');
+            btnEsc1a1.classList.remove('active');
+          }
         });
 
         sliderRotacion.addEventListener('input', (e) => {
@@ -182,40 +209,39 @@
         document.getElementById('btn-borrar').addEventListener('click', () => {
           if(ultimoObjeto) {
             scene.remove(ultimoObjeto);
-            objetosColocados.pop();
+            objetosColocados.pop(); // Saca el último de la lista
+            
+            // Asigna el nuevo "último objeto" si queda alguno
             ultimoObjeto = objetosColocados.length > 0 ? objetosColocados[objetosColocados.length - 1] : null;
             
             if(!ultimoObjeto) {
               controlsPanel.style.display = 'none';
-              status.innerText = "Toca la pantalla para colocar otro objeto.";
+              status.innerText = "Selecciona un objeto y colócalo.";
             } else {
-              // Recuperar valores del objeto anterior si queda alguno
-              sliderEscala.value = ultimoObjeto.scale.x;
-              document.getElementById('val-escala').innerText = ultimoObjeto.scale.x.toFixed(2);
+              // Si queda un objeto, actualizar el slider de rotación visualmente
+              sliderRotacion.value = ultimoObjeto.rotation.y * (180 / Math.PI);
             }
           }
         });
       }
 
-      function onSelect(event) {
-        // Evitar poner objetos si el usuario tocó un botón o slider de la interfaz
-        if (event.target !== renderer.xr.getController(0)) return;
-
+      function onSelect() {
         if (reticle.visible && modeloSeleccionado) {
           const clone = modeloSeleccionado.clone();
           clone.position.setFromMatrixPosition(reticle.matrix);
           
-          // Reiniciar controles para el nuevo objeto
-          sliderEscala.value = 1;
+          // Entra por defecto en 1:1
+          clone.scale.set(1, 1, 1);
+          btnEsc1a1.classList.add('active');
+          btnEsc1a60.classList.remove('active');
           sliderRotacion.value = 0;
-          document.getElementById('val-escala').innerText = "1";
           
           scene.add(clone);
           objetosColocados.push(clone);
           ultimoObjeto = clone;
           
           controlsPanel.style.display = 'block';
-          status.innerText = "Objeto colocado. Ajusta escala o rotación.";
+          status.innerText = "Objeto colocado.";
         }
       }
 
@@ -230,7 +256,11 @@
             session.requestReferenceSpace('viewer').then((referenceSpace) => {
               session.requestHitTestSource({ space: referenceSpace }).then((source) => { hitTestSource = source; });
             });
-            session.addEventListener('end', () => { hitTestSourceRequested = false; hitTestSource = null; controlsPanel.style.display = 'none'; });
+            session.addEventListener('end', () => { 
+              hitTestSourceRequested = false; 
+              hitTestSource = null; 
+              controlsPanel.style.display = 'none'; 
+            });
             hitTestSourceRequested = true;
           }
 
