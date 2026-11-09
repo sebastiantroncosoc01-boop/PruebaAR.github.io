@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -6,11 +7,14 @@
   <meta name="theme-color" content="#172536">
   <title>Visualizador AR Industrial</title>
 
-  <!-- Visor 3D y AR nativa -->
-  <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
+  <script type="module"
+    src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js">
+  </script>
 
   <style>
-    * { box-sizing: border-box; }
+    * {
+      box-sizing: border-box;
+    }
 
     body {
       margin: 0;
@@ -25,13 +29,55 @@
       padding: 18px;
     }
 
-    header h1 { margin: 0; font-size: 1.4rem; }
+    header h1 {
+      margin: 0;
+      font-size: 1.4rem;
+    }
 
     main {
       max-width: 950px;
       margin: auto;
       padding: 16px;
     }
+
+    /* Selector de modelos */
+
+    .selector {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin: 18px 0;
+    }
+
+    .modelo-btn {
+      background: white;
+      border: 2px solid #dce2e8;
+      border-radius: 10px;
+      padding: 15px 8px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: bold;
+      color: #26384a;
+      transition: 0.2s;
+    }
+
+    .modelo-btn:hover {
+      border-color: #1769aa;
+    }
+
+    .modelo-btn.active {
+      background: #e8f2fb;
+      border-color: #1769aa;
+      color: #1769aa;
+    }
+
+    .modelo-btn span {
+      display: block;
+      font-size: 26px;
+      margin-bottom: 8px;
+    }
+
+    /* Visor 3D */
 
     model-viewer {
       display: block;
@@ -44,7 +90,6 @@
       position: relative;
     }
 
-    /* Botón AR Unificado */
     #ar-button {
       background: #1769aa;
       color: white;
@@ -60,39 +105,54 @@
       box-shadow: 0 4px 6px rgba(0,0,0,0.1);
     }
 
-    /* Panel de info dentro de la sesión AR */
     #ar-info-panel {
-      display: none; /* Oculto por defecto en la web */
+      display: none;
       position: absolute;
       top: 16px;
       left: 16px;
       right: 16px;
       max-width: 320px;
-      background: rgba(23, 37, 54, 0.9);
+      background: rgba(23, 37, 54, 0.92);
       color: white;
       padding: 16px;
       border-radius: 12px;
-      pointer-events: none; /* Permite tocar a través del panel */
+      pointer-events: none;
     }
 
-    #ar-info-panel h3 { margin: 0 0 8px; font-size: 16px; }
-    #ar-info-panel p { margin: 4px 0; font-size: 14px; }
+    #ar-info-panel h3 {
+      margin: 0 0 8px;
+      font-size: 16px;
+    }
 
-    /* Mostrar panel solo cuando AR esté activo (gestionado por JS) */
+    #ar-info-panel p {
+      margin: 5px 0;
+      font-size: 14px;
+    }
+
     model-viewer.is-in-ar #ar-info-panel {
       display: block;
     }
 
-    /* Ocultar el botón original mientras estamos en AR */
     model-viewer.is-in-ar #ar-button {
       display: none;
     }
+
+    /* Ficha técnica */
 
     .panel {
       background: white;
       padding: 18px;
       margin-top: 18px;
       border-radius: 12px;
+    }
+
+    .panel h2 {
+      margin-top: 0;
+    }
+
+    .descripcion {
+      color: #555;
+      line-height: 1.5;
     }
 
     .datos {
@@ -106,79 +166,340 @@
       padding: 12px;
       border-radius: 8px;
     }
-    .dato p { margin-bottom: 0; }
+
+    .dato p {
+      margin-bottom: 0;
+    }
+
+    #estado {
+      font-size: 13px;
+      color: #64748b;
+      margin-top: 10px;
+    }
 
     @media (max-width: 550px) {
-      .datos { grid-template-columns: 1fr; }
+      .datos {
+        grid-template-columns: 1fr;
+      }
+
+      .selector {
+        gap: 6px;
+      }
+
+      .modelo-btn {
+        font-size: 12px;
+        padding: 12px 4px;
+      }
+
+      model-viewer {
+        height: 50vh;
+      }
     }
   </style>
 </head>
 
 <body>
-  <header>
-    <h1>Visualizador AR Industrial</h1>
-  </header>
 
-  <main>
-    <h2>Enfardadora industrial</h2>
-    <p>Visualiza el equipo en tres dimensiones y colócalo en tu entorno real.</p>
+<header>
+  <h1>Visualizador AR Industrial</h1>
+</header>
 
-    <!-- Usamos solo model-viewer para manejar tanto WebXR como Quick Look -->
-    <model-viewer
-      id="visor-maquina"
-      src="./Maquina%20A%20prueba.glb"
-      alt="Enfardadora industrial"
-      ar
-      ar-modes="webxr scene-viewer quick-look"
-      ar-scale="fixed"
-      ar-placement="floor"
-      camera-controls
-      shadow-intensity="1"
-      exposure="1">
-      
-      <!-- Botón que activa la experiencia AR -->
-      <button slot="ar-button" id="ar-button">
-        Ver en Realidad Aumentada
-      </button>
+<main>
 
-      <!-- Panel de información superpuesto en AR (Solo Android WebXR) -->
-      <div id="ar-info-panel">
-        <h3>Enfardadora industrial</h3>
-        <p><strong>Fabricante:</strong> IM</p>
-        <p><strong>Dimensiones:</strong> 8 × 4 × 1 m</p>
-        <p><strong>Peso:</strong> 12.000 kg</p>
-        <p><strong>Potencia:</strong> 45 kW</p>
-        <p><strong>Capacidad:</strong> 15 t/h</p>
+  <h2>Seleccionar equipo</h2>
+  <p>
+    Selecciona el elemento que deseas visualizar en tres dimensiones
+    o colocar en tu entorno mediante realidad aumentada.
+  </p>
+
+  <!-- SELECTOR DE MODELOS -->
+
+  <div class="selector">
+
+    <button class="modelo-btn active"
+      data-modelo="maquina"
+      aria-pressed="true">
+      <span>⚙️</span>
+      Enfardadora
+    </button>
+
+    <button class="modelo-btn"
+      data-modelo="fardo"
+      aria-pressed="false">
+      <span>📦</span>
+      Fardo
+    </button>
+
+    <button class="modelo-btn"
+      data-modelo="apilamiento"
+      aria-pressed="false">
+      <span>🏗️</span>
+      Apilamiento
+    </button>
+
+  </div>
+
+  <!-- VISOR 3D Y REALIDAD AUMENTADA -->
+
+  <h2 id="titulo-modelo">Enfardadora industrial</h2>
+
+  <p id="descripcion-modelo">
+    Visualiza el equipo en tres dimensiones y colócalo en tu entorno real.
+  </p>
+
+  <model-viewer
+    id="visor-maquina"
+    src="./Maquina%20A%20prueba.glb"
+    alt="Enfardadora industrial"
+    ar
+    ar-modes="webxr scene-viewer quick-look"
+    ar-scale="fixed"
+    ar-placement="floor"
+    camera-controls
+    shadow-intensity="1"
+    exposure="1">
+
+    <button slot="ar-button" id="ar-button">
+      Ver en Realidad Aumentada
+    </button>
+
+    <!-- PANEL INFORMATIVO PARA ANDROID WEBXR -->
+
+    <div id="ar-info-panel">
+      <h3 id="ar-titulo">Enfardadora industrial</h3>
+      <p><strong>Fabricante:</strong> <span id="ar-fabricante">IM</span></p>
+      <p><strong>Dimensiones:</strong> <span id="ar-dimensiones">8 × 4 × 1 m</span></p>
+      <p><strong>Peso:</strong> <span id="ar-peso">12.000 kg</span></p>
+      <p><strong>Potencia:</strong> <span id="ar-potencia">45 kW</span></p>
+      <p><strong>Capacidad:</strong> <span id="ar-capacidad">15 t/h</span></p>
+    </div>
+
+  </model-viewer>
+
+  <p id="estado" role="status" aria-live="polite">
+    Modelo cargado.
+  </p>
+
+  <!-- FICHA TÉCNICA DINÁMICA -->
+
+  <section class="panel">
+
+    <h2>Información técnica</h2>
+
+    <div class="datos">
+
+      <div class="dato">
+        <strong>Fabricante</strong>
+        <p id="fabricante">IM</p>
       </div>
-    </model-viewer>
 
-    <!-- Ficha técnica estándar de la página web -->
-    <section class="panel">
-      <h2>Información técnica</h2>
-      <div class="datos">
-        <div class="dato"><strong>Fabricante</strong><p>IM</p></div>
-        <div class="dato"><strong>Modelo</strong><p>Modelo de referencia</p></div>
-        <div class="dato"><strong>Dimensiones</strong><p>8 × 4 × 1 m</p></div>
-        <div class="dato"><strong>Peso</strong><p>12.000 kg</p></div>
-        <div class="dato"><strong>Potencia</strong><p>45 kW</p></div>
-        <div class="dato"><strong>Capacidad</strong><p>15 t/h</p></div>
+      <div class="dato">
+        <strong>Modelo</strong>
+        <p id="modelo">Modelo de referencia</p>
       </div>
-    </section>
-  </main>
 
-  <script>
-    const modelViewer = document.getElementById('visor-maquina');
+      <div class="dato">
+        <strong>Dimensiones</strong>
+        <p id="dimensiones">8 × 4 × 1 m</p>
+      </div>
 
-    // Escuchar los cambios de estado de AR nativo del model-viewer
-    modelViewer.addEventListener('ar-status', (event) => {
-      if (event.detail.status === 'session-started') {
-        // Al entrar en AR, añadimos la clase para mostrar el panel HTML sobre la cámara
-        modelViewer.classList.add('is-in-ar');
-      } else if (event.detail.status === 'not-presenting') {
-        // Al salir de AR, ocultamos el panel
-        modelViewer.classList.remove('is-in-ar');
-      }
+      <div class="dato">
+        <strong>Peso</strong>
+        <p id="peso">12.000 kg</p>
+      </div>
+
+      <div class="dato">
+        <strong>Potencia</strong>
+        <p id="potencia">45 kW</p>
+      </div>
+
+      <div class="dato">
+        <strong>Capacidad</strong>
+        <p id="capacidad">15 t/h</p>
+      </div>
+
+    </div>
+
+  </section>
+
+</main>
+
+<script>
+
+  const modelViewer = document.getElementById('visor-maquina');
+
+  // BASE DE DATOS DE LOS TRES MODELOS
+
+  const modelos = {
+
+    maquina: {
+      archivo: './Maquina%20A%20prueba.glb',
+      titulo: 'Enfardadora industrial',
+      descripcion: 'Visualiza la enfardadora industrial en tres dimensiones y colócala en tu entorno real.',
+      fabricante: 'IM',
+      modelo: 'Modelo de referencia',
+      dimensiones: '8 × 4 × 1 m',
+      peso: '12.000 kg',
+      potencia: '45 kW',
+      capacidad: '15 t/h'
+    },
+
+    fardo: {
+      archivo: './Fardo.glb',
+      titulo: 'Fardo compactado',
+      descripcion: 'Visualiza un fardo individual y examina sus dimensiones y características físicas.',
+      fabricante: 'Modelo de referencia',
+      modelo: 'Fardo individual',
+      dimensiones: '2,2 × 0,8 × 0,64 m',
+      peso: '500–600 kg',
+      potencia: 'No aplica',
+      capacidad: 'No aplica'
+    },
+
+    apilamiento: {
+      archivo: './Apilamiento_Fardos.glb',
+      titulo: 'Apilamiento de fardos',
+      descripcion: 'Visualiza una configuración de almacenamiento de múltiples fardos compactados.',
+      fabricante: 'Modelo de referencia',
+      modelo: 'Apilamiento de fardos',
+      dimensiones: 'Según modelo CAD',
+      peso: 'Según configuración',
+      potencia: 'No aplica',
+      capacidad: 'Según configuración'
+    }
+
+  };
+
+  // ACTUALIZAR LA INFORMACIÓN DEL VISUALIZADOR
+
+  function seleccionarModelo(id) {
+
+    const datos = modelos[id];
+
+    if (!datos) return;
+
+    // Cambiar archivo 3D
+
+    modelViewer.src = datos.archivo;
+    modelViewer.alt = datos.titulo;
+
+    // Actualizar títulos y descripciones
+
+    document.getElementById('titulo-modelo').textContent =
+      datos.titulo;
+
+    document.getElementById('descripcion-modelo').textContent =
+      datos.descripcion;
+
+    // Actualizar ficha técnica
+
+    document.getElementById('fabricante').textContent =
+      datos.fabricante;
+
+    document.getElementById('modelo').textContent =
+      datos.modelo;
+
+    document.getElementById('dimensiones').textContent =
+      datos.dimensiones;
+
+    document.getElementById('peso').textContent =
+      datos.peso;
+
+    document.getElementById('potencia').textContent =
+      datos.potencia;
+
+    document.getElementById('capacidad').textContent =
+      datos.capacidad;
+
+    // Actualizar panel informativo AR
+
+    document.getElementById('ar-titulo').textContent =
+      datos.titulo;
+
+    document.getElementById('ar-fabricante').textContent =
+      datos.fabricante;
+
+    document.getElementById('ar-dimensiones').textContent =
+      datos.dimensiones;
+
+    document.getElementById('ar-peso').textContent =
+      datos.peso;
+
+    document.getElementById('ar-potencia').textContent =
+      datos.potencia;
+
+    document.getElementById('ar-capacidad').textContent =
+      datos.capacidad;
+
+    // Actualizar estado de carga
+
+    document.getElementById('estado').textContent =
+      'Cargando modelo 3D...';
+
+    // Actualizar botones activos
+
+    document.querySelectorAll('.modelo-btn').forEach(boton => {
+
+      const activo = boton.dataset.modelo === id;
+
+      boton.classList.toggle('active', activo);
+      boton.setAttribute('aria-pressed', activo);
+
     });
-  </script>
+
+  }
+
+  // EVENTOS DE LOS BOTONES
+
+  document.querySelectorAll('.modelo-btn').forEach(boton => {
+
+    boton.addEventListener('click', () => {
+
+      // No cambiar modelos durante una sesión AR
+
+      if (modelViewer.classList.contains('is-in-ar')) {
+        return;
+      }
+
+      seleccionarModelo(boton.dataset.modelo);
+
+    });
+
+  });
+
+  // ESTADO DE CARGA DEL MODELO
+
+  modelViewer.addEventListener('load', () => {
+
+    document.getElementById('estado').textContent =
+      'Modelo 3D cargado correctamente.';
+
+  });
+
+  modelViewer.addEventListener('error', () => {
+
+    document.getElementById('estado').textContent =
+      'Error al cargar el modelo. Verifica el nombre y la ubicación del archivo.';
+
+  });
+
+  // CONTROL DE REALIDAD AUMENTADA
+
+  modelViewer.addEventListener('ar-status', (event) => {
+
+    if (event.detail.status === 'session-started') {
+
+      modelViewer.classList.add('is-in-ar');
+
+    } else if (event.detail.status === 'not-presenting') {
+
+      modelViewer.classList.remove('is-in-ar');
+
+    }
+
+  });
+
+</script>
+
 </body>
 </html>
