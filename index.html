@@ -2,178 +2,204 @@
 <html lang="es">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#1f2328">
-  <title>Visor AR industrial</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover">
+  <title>Visor AR Híbrido - Industrial</title>
 
-  <!-- Una sola librería (~300 KB comprimida). iOS usa Quick Look; Android usa WebXR/Scene Viewer. -->
+  <!-- Librería para iOS (Model-Viewer) -->
   <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/4.0.0/model-viewer.min.js"></script>
 
+  <!-- Librerías para Android (Three.js para WebXR) -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+
   <style>
-    :root {
-      --ink: #1f2328;
-      --paper: #f1efe9;
-      --line: #cfcbc0;
-      --accent: #f2b705;
-      --muted: #5f6368;
-    }
-    * { box-sizing: border-box; }
-    html, body { height: 100%; margin: 0; }
-    body {
-      display: flex; flex-direction: column;
-      background: var(--paper); color: var(--ink);
-      font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-      padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
-    }
-    header { padding: 14px 16px 8px; }
-    h1 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.01em; }
-    #desc { margin: 2px 0 0; color: var(--muted); font-size: 14px; }
-
-    model-viewer {
-      flex: 1; min-height: 0; width: 100%;
-      background: #e4e1d8;
-      --poster-color: transparent;
-    }
-
-    /* Barra de carga */
-    .bar { position: absolute; left: 0; right: 0; bottom: 0; height: 4px; background: transparent; transition: opacity .3s; }
-    .bar > span { display: block; height: 100%; width: 0; background: var(--accent); }
-    .bar.done { opacity: 0; }
-
-    /* Botón AR dentro del visor */
-    #arBtn {
-      position: absolute; right: 12px; bottom: 16px;
-      min-height: 48px; padding: 0 20px; border: 0; border-radius: 10px;
-      background: var(--accent); color: var(--ink);
-      font: inherit; font-weight: 700; cursor: pointer;
-    }
-
-    #msg {
-      position: absolute; left: 12px; right: 12px; top: 12px;
-      background: var(--ink); color: #fff; border-radius: 8px;
-      padding: 10px 12px; font-size: 14px; display: none;
-    }
-
-    footer { padding: 10px 12px 14px; display: grid; gap: 10px; }
-    .group { display: flex; gap: 8px; }
-    .group.scroll { overflow-x: auto; scrollbar-width: none; }
-    .group.scroll::-webkit-scrollbar { display: none; }
-    .group button {
-      flex: 1 0 auto; min-height: 44px; padding: 0 14px;
-      border: 1.5px solid var(--ink); border-radius: 10px;
-      background: transparent; color: var(--ink);
-      font: inherit; cursor: pointer; white-space: nowrap;
-    }
-    .group button[aria-pressed="true"] { background: var(--ink); color: #fff; }
-    button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
-    #scaleNote { margin: 0; font-size: 13px; color: var(--muted); }
+    body { margin: 0; font-family: sans-serif; background: #f1efe9; overflow: hidden; }
+    
+    /* Contenedores de Interfaz */
+    #ios-container, #android-container { display: none; width: 100vw; height: 100vh; }
+    
+    /* Estilos de iOS */
+    model-viewer { width: 100%; height: 100%; }
+    .ios-menu { position: absolute; bottom: 30px; left: 0; right: 0; display: flex; justify-content: center; gap: 10px; z-index: 10; }
+    .btn { padding: 12px 20px; background: #1f2328; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
+    
+    /* Estilos de Android */
+    #android-menu { position: absolute; bottom: 80px; left: 0; right: 0; display: flex; justify-content: center; gap: 10px; z-index: 10; }
+    .btn-android { padding: 12px 20px; background: #f2b705; color: #1f2328; border: none; border-radius: 8px; font-weight: bold; }
+    #android-status { position: absolute; top: 20px; left: 20px; right: 20px; text-align: center; background: rgba(0,0,0,0.7); color: white; padding: 10px; border-radius: 8px; z-index: 10; }
   </style>
 </head>
 <body>
-  <header>
-    <h1>Visor AR industrial</h1>
-    <p id="desc">Máquina, fardo y apilamiento en conjunto.</p>
-  </header>
 
-  <model-viewer id="mv"
-    alt="Modelo industrial en 3D"
-    camera-controls
-    touch-action="pan-y"
-    shadow-intensity="0.8"
-    exposure="1"
-    ar
-    ar-modes="webxr scene-viewer quick-look"
-    ar-placement="floor"
-    ar-scale="fixed"
-    loading="eager"
-    reveal="auto">
-    <button id="arBtn" slot="ar-button" type="button">Ver en AR</button>
-    <div class="bar" id="bar" slot="progress-bar"><span id="barFill"></span></div>
-    <div id="msg" role="status"></div>
-  </model-viewer>
-
-  <footer>
-    <div class="group scroll" id="objGroup" role="group" aria-label="Objeto">
-      <button type="button" data-obj="conjunto" aria-pressed="true">Conjunto</button>
-      <button type="button" data-obj="maquina" aria-pressed="false">Máquina</button>
-      <button type="button" data-obj="fardo" aria-pressed="false">Fardo</button>
-      <button type="button" data-obj="apilamiento" aria-pressed="false">Apilamiento</button>
+  <!-- =============================== -->
+  <!-- EXPERIENCIA iOS (MODEL VIEWER)  -->
+  <!-- =============================== -->
+  <div id="ios-container">
+    <model-viewer id="mv-ios" src="conjunto.glb" ar ar-modes="quick-look" ar-scale="fixed" camera-controls shadow-intensity="1">
+      <button slot="ar-button" class="btn" style="position:absolute; top:20px; right:20px;">Abrir en AR (iOS)</button>
+    </model-viewer>
+    <div class="ios-menu">
+      <button class="btn" onclick="document.getElementById('mv-ios').src='conjunto.glb'">Escala 1:1</button>
+      <button class="btn" onclick="document.getElementById('mv-ios').src='conjunto_1a60.glb'">Escala 1:60</button>
     </div>
-    <div class="group" id="scaleGroup" role="group" aria-label="Escala">
-      <button type="button" data-scale="1a1" aria-pressed="true">Escala real 1:1</button>
-      <button type="button" data-scale="1a60" aria-pressed="false">Maqueta 1:60</button>
+  </div>
+
+  <!-- =============================== -->
+  <!-- EXPERIENCIA ANDROID (THREE.JS)  -->
+  <!-- =============================== -->
+  <div id="android-container">
+    <div id="android-status">Iniciando motor AR para Android...</div>
+    <div id="android-menu">
+      <button class="btn-android" id="btn-maquina">Poner Máquina</button>
+      <button class="btn-android" id="btn-fardo">Poner Fardo</button>
     </div>
-    <p id="scaleNote">En AR el tamaño queda fijo. Ponte de pie a 2 m del lugar y apunta al suelo.</p>
-  </footer>
+    <!-- Aquí Three.js inyectará su botón de AR y su Canvas (Cámara) -->
+  </div>
 
-<script>
-  /* ====== CONFIGURACIÓN ======
-     Los archivos salen de preparar.mjs y deben estar en ./modelos/
-       conjunto.glb, conjunto_1a60.glb, maquina.glb, maquina_1a60.glb, ...
-     Si además tienes un .usdz con el mismo nombre (conjunto.usdz, conjunto_1a60.usdz...),
-     pon USAR_USDZ = true: en iPhone abre al instante, sin generarlo al tocar "Ver en AR". */
-  const CARPETA = './modelos/';
-  const USAR_USDZ = false;
+  <script type="module">
+    import * as THREE from 'three';
+    import { ARButton } from 'three/addons/webxr/ARButton.js';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
-  const DESCRIPCIONES = {
-    conjunto: 'Máquina, fardo y apilamiento en conjunto.',
-    maquina: 'Máquina industrial principal.',
-    fardo: 'Fardo individual de material compactado.',
-    apilamiento: 'Fardos apilados.'
-  };
+    // 1. DETECCIÓN DE SISTEMA OPERATIVO
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 
-  const mv = document.getElementById('mv');
-  const msg = document.getElementById('msg');
-  const bar = document.getElementById('bar');
-  const fill = document.getElementById('barFill');
-  const estado = { obj: 'conjunto', escala: '1a1' };
-
-  function mostrar(texto) {
-    msg.textContent = texto;
-    msg.style.display = texto ? 'block' : 'none';
-  }
-
-  function cargar() {
-    const base = CARPETA + estado.obj + (estado.escala === '1a60' ? '_1a60' : '');
-    bar.classList.remove('done');
-    fill.style.width = '0';
-    mostrar('');
-    if (USAR_USDZ) mv.setAttribute('ios-src', base + '.usdz');
-    else mv.removeAttribute('ios-src');
-    mv.src = base + '.glb';
-    document.getElementById('desc').textContent =
-      DESCRIPCIONES[estado.obj] + (estado.escala === '1a60' ? ' Escala 1:60.' : ' Escala real.');
-  }
-
-  function activar(grupo, atributo, valor) {
-    document.querySelectorAll(`#${grupo} button`).forEach(b =>
-      b.setAttribute('aria-pressed', String(b.dataset[atributo] === valor)));
-  }
-
-  document.getElementById('objGroup').addEventListener('click', e => {
-    const b = e.target.closest('button'); if (!b) return;
-    estado.obj = b.dataset.obj; activar('objGroup', 'obj', estado.obj); cargar();
-  });
-  document.getElementById('scaleGroup').addEventListener('click', e => {
-    const b = e.target.closest('button'); if (!b) return;
-    estado.escala = b.dataset.scale; activar('scaleGroup', 'scale', estado.escala); cargar();
-  });
-
-  mv.addEventListener('progress', e => {
-    fill.style.width = Math.round(e.detail.totalProgress * 100) + '%';
-  });
-  mv.addEventListener('load', () => {
-    bar.classList.add('done');
-    if (!mv.canActivateAR) {
-      document.getElementById('scaleNote').textContent =
-        'La vista AR solo está disponible en un móvil (Safari en iPhone o Chrome en Android).';
+    if (isIOS) {
+      // Mostrar la interfaz de iOS y ocultar Android
+      document.getElementById('ios-container').style.display = 'block';
+    } else {
+      // Mostrar la interfaz de Android y configurar WebXR
+      document.getElementById('android-container').style.display = 'block';
+      initAndroidAR();
     }
-  });
-  mv.addEventListener('error', () => {
-    mostrar('No se pudo cargar el modelo. Revisa que el archivo exista en la carpeta "modelos" y que el nombre coincida (mayúsculas incluidas).');
-  });
 
-  cargar();
-</script>
+    // 2. LÓGICA DE ANDROID (WEBXR CON THREE.JS)
+    function initAndroidAR() {
+      let container, camera, scene, renderer, reticle;
+      let hitTestSource = null;
+      let hitTestSourceRequested = false;
+      
+      // Variables para los modelos separados
+      let loader = new GLTFLoader();
+      let maquinaModelo, fardoModelo;
+      let modeloSeleccionado = null; // Qué objeto va a colocar el usuario
+
+      const status = document.getElementById('android-status');
+
+      init();
+      animate();
+
+      function init() {
+        container = document.getElementById('android-container');
+        scene = new THREE.Scene();
+        camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
+
+        // Iluminación
+        const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
+        light.position.set(0.5, 1, 0.25);
+        scene.add(light);
+
+        // Configuración del motor de render
+        renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.xr.enabled = true; // Activar Realidad Aumentada
+        container.appendChild(renderer.domElement);
+
+        // Inyectar el botón nativo de WebXR
+        const arButton = ARButton.createButton(renderer, { requiredFeatures: ['hit-test'] });
+        arButton.style.bottom = '150px'; // Subir el botón para que no tape el menú
+        document.body.appendChild(arButton);
+
+        // Precargar modelos individuales (Asegúrate de que existan estos archivos)
+        loader.load('Maquina A prueba.glb', function (gltf) {
+          maquinaModelo = gltf.scene;
+          status.innerText = "Máquina cargada. Selecciona un objeto.";
+          modeloSeleccionado = maquinaModelo; // Por defecto
+        });
+        
+        loader.load('Fardo.glb', function (gltf) {
+          fardoModelo = gltf.scene;
+        });
+
+        // Configurar botones de selección
+        document.getElementById('btn-maquina').addEventListener('click', () => { 
+          modeloSeleccionado = maquinaModelo; 
+          status.innerText = "Máquina seleccionada. Toca la pantalla para ponerla.";
+        });
+        document.getElementById('btn-fardo').addEventListener('click', () => { 
+          modeloSeleccionado = fardoModelo; 
+          status.innerText = "Fardo seleccionado. Toca la pantalla para ponerlo.";
+        });
+
+        // Evento al tocar la pantalla en AR (Instanciar el objeto)
+        const controller = renderer.xr.getController(0);
+        controller.addEventListener('select', onSelect);
+        scene.add(controller);
+
+        // Crear el "Retículo" (el círculo que flota en el piso para apuntar)
+        reticle = new THREE.Mesh(
+          new THREE.RingGeometry(0.15, 0.2, 32).rotateX(-Math.PI / 2),
+          new THREE.MeshBasicMaterial({ color: 0xf2b705 })
+        );
+        reticle.matrixAutoUpdate = false;
+        reticle.visible = false;
+        scene.add(reticle);
+      }
+
+      // Función que coloca el modelo en el mundo real
+      function onSelect() {
+        if (reticle.visible && modeloSeleccionado) {
+          const clone = modeloSeleccionado.clone();
+          clone.position.setFromMatrixPosition(reticle.matrix);
+          scene.add(clone);
+          status.innerText = "¡Objeto colocado!";
+        }
+      }
+
+      function animate() {
+        renderer.setAnimationLoop(render);
+      }
+
+      // Motor físico y detección del suelo (Hit-Test)
+      function render(timestamp, frame) {
+        if (frame) {
+          const referenceSpace = renderer.xr.getReferenceSpace();
+          const session = renderer.xr.getSession();
+
+          if (hitTestSourceRequested === false) {
+            session.requestReferenceSpace('viewer').then(function (referenceSpace) {
+              session.requestHitTestSource({ space: referenceSpace }).then(function (source) {
+                hitTestSource = source;
+              });
+            });
+            session.addEventListener('end', function () {
+              hitTestSourceRequested = false;
+              hitTestSource = null;
+            });
+            hitTestSourceRequested = true;
+          }
+
+          if (hitTestSource) {
+            const hitTestResults = frame.getHitTestResults(hitTestSource);
+            if (hitTestResults.length > 0) {
+              const hit = hitTestResults[0];
+              reticle.visible = true;
+              reticle.matrix.fromArray(hit.getPose(referenceSpace).transform.matrix);
+            } else {
+              reticle.visible = false;
+            }
+          }
+        }
+        renderer.render(scene, camera);
+      }
+    }
+  </script>
 </body>
 </html>
